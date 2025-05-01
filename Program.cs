@@ -53,8 +53,8 @@ CoconaApp.Run((
 
     try
     {
-        // var analyzer = new GitHubAnalyzer();
-        // analyzer.Analyze(repos[0], repos[1]);
+        var analyzer = new GitHubAnalyzer();
+        analyzer.Analyze(owner, repo, output, format);
     }
     catch (Exception ex)
     {
