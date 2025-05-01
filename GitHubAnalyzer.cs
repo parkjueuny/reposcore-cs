@@ -1,8 +1,9 @@
 using Octokit;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Text.Json;
 using Cocona;
 
 public class GitHubAnalyzer
@@ -14,17 +15,20 @@ public class GitHubAnalyzer
         _client = new GitHubClient(new ProductHeaderValue("reposcore-cs"));
     }
 
-    public void Analyze(string owner, string repo)
+    public void Analyze(
+        string owner,
+        string repo,
+        [Option("output", Description = "출력 경로. 지정하지 않으면 콘솔에 출력됩니다.")] string output = null,
+        [Option("format", Description = "출력 포맷: text 또는 json")] string format = "text"
+    )
     {
         try
         {
-            // 병합된 PR 수집
             var prs = _client.PullRequest.GetAllForRepository(owner, repo, new PullRequestRequest
             {
                 State = ItemStateFilter.Closed
             }).Result;
 
-            // 전체 이슈 수집
             var issues = _client.Issue.GetAllForRepository(owner, repo, new RepositoryIssueRequest
             {
                 State = ItemStateFilter.All
@@ -32,51 +36,74 @@ public class GitHubAnalyzer
 
             var targetLabels = new[] { "bug", "documentation", "enhancement" };
 
-            var labelCounts = targetLabels.ToDictionary(label => label, label => 0);
+            int pr_bug = 0, pr_doc = 0, pr_feat = 0;
+            int issue_bug = 0, issue_doc = 0, issue_feat = 0;
 
-            // PR 분류 (병합된 것만)
             foreach (var pr in prs.Where(p => p.Merged == true))
             {
                 var labels = pr.Labels.Select(l => l.Name.ToLower()).ToList();
 
-                foreach (var label in targetLabels)
-                {
-                    if (labels.Contains(label))
-                    {
-                        labelCounts[label]++;
-                    }
-                }
+                if (labels.Contains("bug")) pr_bug++;
+                if (labels.Contains("documentation")) pr_doc++;
+                if (labels.Contains("enhancement")) pr_feat++;
             }
 
-            // 이슈 분류 (PR 제외)
             foreach (var issue in issues)
             {
-                if (issue.PullRequest != null) continue; // PR 제외
+                if (issue.PullRequest != null) continue;
 
                 var labels = issue.Labels.Select(l => l.Name.ToLower()).ToList();
 
-                foreach (var label in targetLabels)
-                {
-                    if (labels.Contains(label))
-                    {
-                        labelCounts[label]++;
-                    }
-                }
+                if (labels.Contains("bug")) issue_bug++;
+                if (labels.Contains("documentation")) issue_doc++;
+                if (labels.Contains("enhancement")) issue_feat++;
             }
 
+            if (!string.IsNullOrEmpty(output))
+            {
+                if (format.ToLower() == "json")
+                {
+                    var result = new
+                    {
+                        PullRequests = new { Bug = pr_bug, Documentation = pr_doc, Enhancement = pr_feat },
+                        Issues = new { Bug = issue_bug, Documentation = issue_doc, Enhancement = issue_feat }
+                    };
 
-            // 결과 출력
-            Console.WriteLine("\n📊 GitHub Label 통계 결과");
+                    var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(output, json);
+                    Console.WriteLine($"📁 결과가 JSON 파일로 저장되었습니다: {output}");
+                }
+                else
+                {
+                    using (var writer = new StreamWriter(output))
+                    {
+                        writer.WriteLine("\n📊 GitHub Label 통계 결과");
+                        writer.WriteLine("\n✅ Pull Requests (Merged)");
+                        writer.WriteLine($"- Bug PRs: {pr_bug}");
+                        writer.WriteLine($"- Documentation PRs: {pr_doc}");
+                        writer.WriteLine($"- Enhancement PRs: {pr_feat}");
+                        writer.WriteLine("\n✅ Issues");
+                        writer.WriteLine($"- Bug Issues: {issue_bug}");
+                        writer.WriteLine($"- Documentation Issues: {issue_doc}");
+                        writer.WriteLine($"- Enhancement Issues: {issue_feat}");
+                    }
+                    Console.WriteLine($"📁 결과가 텍스트 파일로 저장되었습니다: {output}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("\n📊 GitHub Label 통계 결과");
 
-            Console.WriteLine("\n✅ Pull Requests (Merged)");
-            Console.WriteLine($"- Bug PRs: {pr_bug}");
-            Console.WriteLine($"- Documentation PRs: {pr_doc}");
-            Console.WriteLine($"- Enhancement PRs: {pr_feat}");
+                Console.WriteLine("\n✅ Pull Requests (Merged)");
+                Console.WriteLine($"- Bug PRs: {pr_bug}");
+                Console.WriteLine($"- Documentation PRs: {pr_doc}");
+                Console.WriteLine($"- Enhancement PRs: {pr_feat}");
 
-            Console.WriteLine("\n✅ Issues");
-            Console.WriteLine($"- Bug Issues: {issue_bug}");
-            Console.WriteLine($"- Documentation Issues: {issue_doc}");
-            Console.WriteLine($"- Enhancement Issues: {issue_feat}");
+                Console.WriteLine("\n✅ Issues");
+                Console.WriteLine($"- Bug Issues: {issue_bug}");
+                Console.WriteLine($"- Documentation Issues: {issue_doc}");
+                Console.WriteLine($"- Enhancement Issues: {issue_feat}");
+            }
         }
         catch (RateLimitExceededException)
         {
