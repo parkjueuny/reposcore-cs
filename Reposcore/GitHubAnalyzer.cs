@@ -117,6 +117,13 @@ public class GitHubAnalyzer
 
             foreach (var format in formats)
             {
+                // 파일 이름으로 유효한 문자만 사용되었는지 확인
+                if (format.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                {
+                    Console.WriteLine($"❗ 출력 형식 '{format}'에 유효하지 않은 문자가 포함되어 있어 파일을 생성할 수 없습니다.");
+                    Environment.Exit(1);
+                }
+
                 string fileName = $"result.{format.ToLower()}";
                 string filePath = Path.Combine(outputDir, fileName);
 
