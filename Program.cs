@@ -4,7 +4,7 @@ using System.IO;                 // File, Path
 using System.Linq;
 using System.Collections.Generic;
 
-CoconaApp.Run((
+CoconaApp.Run(( 
     [Argument(Description = "분석할 저장소. \"owner/repo\" 형식으로 공백을 구분자로 하여 여러 개 입력")] string[] repos,
     [Option('v', Description = "자세한 로그 출력을 활성화합니다.")] bool verbose = false,
     [Option('o', Description = "출력 디렉토리 경로를 지정합니다. (default : \"output\")", ValueName = "Output directory")] string? output,
@@ -172,6 +172,7 @@ CoconaApp.Run((
         totalGen.GenerateChart();
         
     }
+    // --user 옵션이 지정된 경우, 해당 사용자의 점수와 순위만 출력
     else if (!string.IsNullOrEmpty(singleUser) && totalScores.Count > 0)
     {
         var sortedScores = totalScores.OrderByDescending(x => x.Value.total).ToList();
@@ -209,6 +210,7 @@ CoconaApp.Run((
             Console.WriteLine($"'{singleUser}' 사용자를 찾을 수 없습니다.");
         }
     }
+
 
     if (failedRepos.Count > 0)
     {
